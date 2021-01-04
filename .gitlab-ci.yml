@@ -1,0 +1,46 @@
+image: openjdk:8-jdk
+
+variables:
+  ANDROID_COMPILE_SDK: "28" #set compile SDK version
+  ANDROID_BUILD_TOOLS: "28.0.2" #set build tool version
+  ANDROID_SDK_TOOLS:   "4333796" #set SDK tool build number you can find yous here https://developer.android.com/studio/releases/sdk-tools
+
+
+stages:
+  - build
+
+cache:
+  key: ${CI_PROJECT_ID}
+  paths:
+  - android/.gradle/
+  - node_modules/
+  
+build:
+  stage: build
+  only:
+    - tags
+    - build
+  except:
+    - master
+  before_script:
+    - curl -sL https://deb.nodesource.com/setup_10.x | bash #Add Node Repo
+    - apt-get install -y nodejs
+    - npm install
+    - npm install -g react-native-cli
+    - react-native link react-native-vector-icons
+    - react-native link react-native-gesture-handler
+    - react-native link react-native-screens
+    - wget --quiet --output-document=/tmp/sdk-tools-linux.zip https://dl.google.com/android/repository/sdk-tools-linux-${ANDROID_SDK_TOOLS}.zip
+    - unzip /tmp/sdk-tools-linux.zip -d .android
+    - export ANDROID_HOME=$PWD/.android
+    - export PATH=$PATH:$PWD/.android/platform-tools/
+    - echo y | .android/tools/bin/sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}"
+  script:
+    - cd android/ && ./gradlew --stacktrace assembleRelease
+    - mkdir ../apk && cp -fr app/build/outputs/apk/* ../apk/
+    
+  artifacts:
+    name: "${CI_PROJECT_ID}_release_${CI_COMMIT_REF_NAME}"
+    expire_in: 24 hour
+    paths:
+    - apk/
